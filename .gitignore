@@ -15,6 +15,7 @@
 *.p12
 *.jks
 openclaw.json
+doc
 
 # ============ Build Artifacts ============
 /target/
@@ -35,11 +36,12 @@ out/
 *.rs.bk
 *.bk
 *.bak
+*.pdb
+debug/
 
 # ============ Dependency Management ============
 node_modules/
 **/node_modules/
-/vendor/*
 !/vendor/open-lark/
 # Note: vendor/open-lark is tracked because it's a patched local dependency
 
@@ -78,6 +80,7 @@ e2e/node_modules/
 **/playwright-report/
 **/blob-report/
 **/test-results/
+**/mutants.out*/
 
 # ============ Logs & Temporary ============
 *.log
