@@ -1,0 +1,27 @@
+[package]
+name = "feishu-domain"
+description = "Pure domain layer: Config, Error, Models, Security, Port traits, Codec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["sync"] }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+toml = "0.8"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+criterion = { workspace = true }
+
+[[bench]]
+name = "codec"
+harness = false
+
+[[bench]]
+name = "security"
+harness = false

@@ -1,0 +1,31 @@
+{
+  "id": "clawrs-feishu",
+  "channels": ["clawrs-feishu"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "accounts": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "appId": { "type": "string" },
+            "appSecret": { "type": "string" },
+            "domain": { "type": "string", "enum": ["feishu", "lark"] },
+            "connectionMode": { "type": "string", "enum": ["websocket", "webhook"] },
+            "dmPolicy": { "type": "string", "enum": ["pairing", "open", "deny"] },
+            "groupPolicy": { "type": "string", "enum": ["allowlist", "open", "deny"] },
+            "allowFrom": { "type": "array", "items": { "type": "string" } },
+            "groupAllowFrom": { "type": "array", "items": { "type": "string" } },
+            "groupRequireMention": { "type": "boolean" }
+          },
+          "required": ["appId", "appSecret"]
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "accounts": { "label": "Accounts" }
+  }
+}

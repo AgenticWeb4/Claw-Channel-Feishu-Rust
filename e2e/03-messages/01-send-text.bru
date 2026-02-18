@@ -1,0 +1,138 @@
+meta {
+  name: Send Text Message (DM)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"{{test_text_message}}\"}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.data.message_id: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("No token. Run 01-auth tests first.");
+  }
+  
+  const chatId = bru.getEnvVar("test_chat_id");
+  if (!chatId || chatId.includes("placeholder")) {
+    console.warn("⚠ Using placeholder chat_id. Replace with real value for actual test.");
+  }
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    const messageId = res.body.data?.message_id;
+    bru.setEnvVar("last_sent_message_id", messageId);
+    console.log("✓ Message sent successfully");
+    console.log("  Message ID:", messageId);
+    console.log("  Sent to:", bru.getEnvVar("test_chat_id"));
+    console.log("  Content:", bru.getEnvVar("test_text_message"));
+  } else {
+    console.error("✗ Message send failed:", res.body.msg);
+    console.error("  Error code:", res.body.code);
+  }
+}
+
+tests {
+  test("F-003: should send text message successfully", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data).to.have.property('message_id');
+  });
+  
+  test("message_id should be valid format", function() {
+    const msgId = res.body.data.message_id;
+    expect(msgId).to.be.a('string');
+    expect(msgId).to.match(/^om_/);
+  });
+  
+  test("should meet performance NFR-001", function() {
+    // Message send should complete within 3s
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+  
+  test("should encode message content correctly", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data.message_id).to.match(/^om_/);
+  });
+}
+
+docs {
+  # F-003: 文本消息发送 — Scene-001 DM 文本对话
+  
+  **功能需求**: F-003 文本消息发送（Must）
+  **业务场景**: Scene-001 DM 文本对话
+  **Persona**: Persona-002 飞书终端用户
+  **优先级**: Must
+  
+  ## 测试目的
+  
+  验证 `FeishuChannel::send()` 能够成功发送文本消息到私聊。
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given 飞书 tenant_access_token 有效
+  When 调用 FeishuChannel::send("Reply text", "<chat_id>")
+  Then POST https://open.feishu.cn/open-apis/im/v1/messages 返回 code=0
+  And data.message_id 存在且以 "om_" 开头
+  ```
+  
+  ## 实现映射
+  
+  ```rust
+  // clawrs-feishu/src/channel.rs
+  async fn send(&self, message: &str, chat_id: &str) -> anyhow::Result<()> {
+      let token = self.auth.get_token().await?;
+      let body = serde_json::json!({
+          "receive_id": chat_id,
+          "msg_type": "text",
+          "content": encode_text_message(message),
+      });
+      // POST to im/v1/messages...
+  }
+  ```
+  
+  ## 消息格式
+  
+  飞书文本消息 content 必须是 **JSON 编码的字符串**：
+  - 正确: `"{\"text\":\"Hello\"}"`
+  - 错误: `{"text":"Hello"}`
+  
+  ## 错误码
+  
+  - E-FEISHU-3001: 消息发送失败
+  - `code=230002`: 不是群成员/会话不存在
+  - `code=1254044`: 机器人被禁言
+  
+  ## 参考
+  
+  - ADR-001: 直接 HTTP API（无 SDK）
+  - messages.rs::encode_text_message()
+  - [飞书发送消息 API](https://open.feishu.cn/document/server-docs/im-v1/message/create)
+}

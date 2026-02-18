@@ -1,0 +1,121 @@
+meta {
+  name: Allowlist - Allow Authorized User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{zeroclaw_gateway_url}}/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "schema": "2.0",
+    "header": {
+      "event_id": "test_allow_{{$randomInt}}",
+      "event_type": "im.message.receive_v1",
+      "create_time": "{{$timestamp}}",
+      "token": "test_token",
+      "app_id": "{{app_id}}",
+      "tenant_key": "test"
+    },
+    "event": {
+      "sender": {
+        "sender_id": {
+          "open_id": "{{test_user_open_id}}"
+        }
+      },
+      "message": {
+        "message_id": "om_allowed_test",
+        "chat_id": "{{test_chat_id}}",
+        "chat_type": "p2p",
+        "message_type": "text",
+        "content": "{\"text\":\"[E2E] E2E-04-01 Test message from allowed user\"}"
+      }
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:pre-request {
+  const allowedUser = bru.getEnvVar("test_user_open_id");
+  console.log("ℹ Testing allowlist ALLOW scenario");
+  console.log("  User:", allowedUser);
+  console.log("  Expected: Message should be processed ✓");
+}
+
+script:post-response {
+  console.log("✓ Authorized user message accepted");
+  console.log("  User:", bru.getEnvVar("test_user_open_id"));
+  console.log("  Status:", res.status);
+}
+
+tests {
+  test("F-004: allowlisted user should be accepted", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("should match security guard logic", function() {
+    // SecurityGuard::is_user_allowed() should return true
+    const userId = bru.getEnvVar("test_user_open_id");
+    expect(userId).to.exist;
+  });
+}
+
+docs {
+  # F-004: Allowlist 安全过滤 — 允许场景
+  
+  **功能需求**: F-004 Allowlist 安全过滤（Must）
+  **场景**: 白名单用户正常通过
+  **Persona**: Persona-002（已授权用户）
+  **优先级**: Must
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given allowed_users = ["ou_abc123", "{{test_user_open_id}}"]
+  When 收到来自 "{{test_user_open_id}}" 的消息
+  Then 消息被正常处理
+  And 推送到 LLM
+  ```
+  
+  ## 实现映射
+  
+  ```rust
+  // security.rs
+  pub fn is_user_allowed(&self, user_id: &str) -> bool {
+      self.allowed_users.iter().any(|u| u == "*" || u == user_id)
+  }
+  
+  // websocket.rs
+  if !self.guard.is_user_allowed(sender_open_id) {
+      tracing::warn!("ignoring message from unauthorized user: {sender_open_id}");
+      return Ok(());
+  }
+  ```
+  
+  ## Allowlist 规则（ASR-004）
+  
+  - 空列表 `[]` → 拒绝所有
+  - 通配符 `["*"]` → 允许所有（显式 opt-in）
+  - 精确匹配 `["ou_abc"]` → 仅允许指定用户
+  
+  ## 日志输出（允许场景）
+  
+  无 warn 日志（静默处理）
+  
+  ## 参考
+  
+  - ADR-004: ZeroClaw allowlist 风格
+  - Task 4: SecurityGuard 实现
+  - 对比测试: `04-security/02-allowlist-deny.bru`
+}

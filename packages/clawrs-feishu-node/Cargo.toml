@@ -1,0 +1,21 @@
+[package]
+name = "clawrs-feishu-node"
+version = "1.0.0"
+edition = "2021"
+description = "Node.js bindings for clawrs-feishu via napi-rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+clawrs-feishu = { path = "../../crates/clawrs-feishu" }
+feishu-domain = { path = "../../crates/feishu-domain" }
+napi = { version = "2", default-features = false, features = ["napi8", "napi4", "tokio_rt"] }
+napi-derive = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "rt-multi-thread"] }
+tracing = "0.1"
+
+[build-dependencies]
+napi-build = "2"

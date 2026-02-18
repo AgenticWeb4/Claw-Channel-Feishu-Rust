@@ -1,0 +1,90 @@
+meta {
+  name: open-lark Token Reuse Across APIs
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis/bot/v3/info
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("Token not available. Previous tests should have set it.");
+  }
+  console.log("ℹ Verifying token reuse across different API endpoints");
+  console.log("  Token (first 20):", token.substring(0, 20) + "...");
+  console.log("  Previous uses: auth → im/send → bot/info (this call)");
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    console.log("✓ Token successfully reused across bot/v3/info");
+    console.log("  Same token valid for: auth, im, bot APIs");
+    console.log("");
+    console.log("ℹ open-lark TokenManager caching validated:");
+    console.log("  with_enable_token_cache(true) → single token for all services");
+  } else if (res.body.code === 99991668) {
+    console.error("✗ Token expired or invalidated between API calls");
+    console.error("  This indicates token caching issue in open-lark");
+  }
+}
+
+tests {
+  test("open-lark: same token should work across different APIs", function() {
+    // Token obtained in 01-token-via-sdk should still work here
+    // This validates open-lark's with_enable_token_cache(true)
+    expect(res.body.code).to.equal(0);
+  });
+
+  test("open-lark: token should not expire between sequential calls", function() {
+    // Token TTL is ~7200s; sequential e2e calls take ~5s total
+    expect(res.body.code).to.not.equal(99991668); // not expired
+    expect(res.body.code).to.not.equal(99991664); // not invalid
+  });
+
+  test("open-lark: cached token performance advantage", function() {
+    // Reusing a cached token should be fast (no auth round-trip)
+    expect(res.responseTime).to.be.lessThan(2000);
+  });
+}
+
+docs {
+  # open-lark Token Reuse Validation
+
+  Validates that a single tenant_access_token can be reused across
+  multiple API endpoints (auth, im, bot), confirming open-lark's
+  TokenManager caching works correctly.
+
+  ## Token flow in open-lark
+
+  ```
+  LarkClient::builder(app_id, app_secret)
+    .with_enable_token_cache(true)  // ← enables caching
+    .build()
+
+  // First API call → TokenManager fetches new token
+  // Subsequent calls → TokenManager returns cached token
+  // Token near expiry → TokenManager auto-refreshes
+  ```
+
+  ## This test validates
+
+  1. Token obtained in test 01 is still valid
+  2. Same token works for bot/v3/info (different endpoint)
+  3. No token invalidation between sequential API calls
+  4. Performance is fast (no extra auth round-trip)
+}

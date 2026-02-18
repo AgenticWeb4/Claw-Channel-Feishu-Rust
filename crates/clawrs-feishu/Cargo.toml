@@ -1,0 +1,19 @@
+[package]
+name = "clawrs-feishu"
+description = "Feishu/Lark channel adapter for Claw family (zeroclaw, openclaw, etc.) - 4-crate Hexagonal + Microkernel + DDD"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+feishu-domain   = { workspace = true }
+feishu-kernel   = { workspace = true }
+feishu-platform = { workspace = true }
+open-lark = { workspace = true, features = ["im", "authentication", "websocket", "bot"] }
+tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros"] }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Claw Feishu Channel E2E Tests",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -1,0 +1,93 @@
+meta {
+  name: Send Post Message (Markdown)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "post",
+    "content": "{\"zh_cn\":{\"content\":[[{\"tag\":\"md\",\"text\":\"[E2E] E2E-03-09 **Bold** and *italic* from Bruno post test\"}]]}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.data.message_id: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("No token. Run 01-auth tests first.");
+  }
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    bru.setEnvVar("last_sent_message_id", res.body.data?.message_id);
+    console.log("✓ Post message sent successfully");
+    console.log("  Message ID:", res.body.data?.message_id);
+    console.log("  msg_type: post (Markdown rendering)");
+  }
+}
+
+tests {
+  test("F-003: should send post message successfully", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data).to.have.property('message_id');
+  });
+
+  test("message_id should be valid format", function() {
+    const msgId = res.body.data.message_id;
+    expect(msgId).to.be.a('string');
+    expect(msgId).to.match(/^om_/);
+  });
+
+  test("post format enables Markdown rendering", function() {
+    expect(res.body.code).to.equal(0);
+  });
+}
+
+docs {
+  # F-003: Post 富文本消息发送 — Markdown 渲染
+
+  **功能需求**: F-003 消息发送（Must）
+  **场景**: 使用 msg_type=post 支持 Markdown 渲染
+  **优先级**: Must
+
+  ## 验收条件
+
+  ```gherkin
+  Given tenant_access_token 有效
+  When 调用 im/v1/messages 且 msg_type=post
+  And content 为 zh_cn 格式含 tag=md
+  Then 返回 code=0
+  And message_id 存在
+  ```
+
+  ## 实现映射
+
+  ```rust
+  // feishu-platform/im.rs
+  .msg_type("post")
+  .content(encode_post_message(content))
+  ```
+}

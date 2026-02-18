@@ -1,0 +1,31 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt_ws_post_md_001",
+    "event_type": "im.message.receive_v1",
+    "create_time": "1719211482725",
+    "token": "",
+    "app_id": "cli_test",
+    "tenant_key": "tenant_001"
+  },
+  "event": {
+    "sender": {
+      "sender_id": {
+        "open_id": "ou_user_md",
+        "union_id": "on_union_md",
+        "user_id": "usr_md"
+      },
+      "sender_type": "user",
+      "tenant_key": "tenant_001"
+    },
+    "message": {
+      "message_id": "om_msg_post_md_001",
+      "chat_id": "oc_chat_001",
+      "chat_type": "group",
+      "message_type": "post",
+      "content": "{\"zh_cn\":{\"content\":[[{\"tag\":\"md\",\"text\":\"**加粗** 和 *斜体*\\n\\n```js\\nconst x = 1;\\n```\"}]]}}",
+      "create_time": "1719211482490",
+      "update_time": "1719211482490"
+    }
+  }
+}

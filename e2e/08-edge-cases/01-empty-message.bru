@@ -1,0 +1,45 @@
+meta {
+  name: Edge Case - Empty Message Content
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"\"}"
+  }
+}
+
+tests {
+  test("should handle empty text content", function() {
+    // Feishu may reject or accept empty text -- either way should not crash
+    expect(res.status).to.be.oneOf([200, 400]);
+  });
+
+  test("should respond within timeout", function() {
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # Edge Case: Empty Message Content
+
+  Validates that the Feishu API gracefully handles an empty text string.
+  Maps to `feishu-domain::codec::encode_text_message("")` → `{"text":""}`.
+}

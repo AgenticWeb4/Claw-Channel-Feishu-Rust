@@ -1,0 +1,27 @@
+# Release configuration for clawrs-feishu-channel
+
+version:
+  file: Cargo.toml
+  path: workspace.package.version
+
+changelog:
+  files:
+    - path: CHANGELOG.md
+      lang: en
+    - path: CHANGELOG.zh.md
+      lang: zh
+  sections:
+    feat: Features
+    fix: Fixes
+    docs: Documentation
+    refactor: Refactor
+    perf: Performance
+    test: Tests
+    chore: null
+
+commit:
+  message: "chore: release v{version}"
+
+tag:
+  prefix: v
+  sign: false

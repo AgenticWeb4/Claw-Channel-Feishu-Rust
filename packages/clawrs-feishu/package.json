@@ -1,0 +1,50 @@
+{
+  "name": "@openclaw/clawrs-feishu",
+  "version": "1.3.0",
+  "description": "Feishu channel via clawrs-feishu-channel (Rust)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "clawrs-feishu",
+      "label": "Feishu (Claw)",
+      "selectionLabel": "Feishu (Rust/Claw)",
+      "docsPath": "/channels/clawrs-feishu",
+      "blurb": "Feishu via clawrs-feishu-channel (Rust).",
+      "aliases": [
+        "feishu",
+        "feishu-rust",
+        "feishu-claw"
+      ],
+      "replaces": "@openclaw/feishu"
+    },
+    "install": {
+      "npmSpec": "@openclaw/clawrs-feishu",
+      "defaultChoice": "npm"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "clawrs-feishu-node": "file:../clawrs-feishu-node"
+  },
+  "peerDependencies": {
+    "openclaw": ">=1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json"
+  ]
+}

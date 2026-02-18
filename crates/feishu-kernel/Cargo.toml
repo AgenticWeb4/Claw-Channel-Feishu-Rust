@@ -1,0 +1,15 @@
+[package]
+name = "feishu-kernel"
+description = "Microkernel runtime: Capability trait, EventBus, FeishuKernel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+feishu-domain = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

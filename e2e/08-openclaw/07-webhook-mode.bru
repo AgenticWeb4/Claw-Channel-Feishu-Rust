@@ -1,0 +1,16 @@
+meta {
+  name: Webhook Mode (Placeholder)
+  type: http
+  seq: 7
+}
+
+docs {
+  # Webhook 模式
+
+  验证 clawrs-feishu 在 connection_mode=webhook 时的行为：
+  - 启动 HTTP 服务监听 webhook_port（默认 8081）
+  - URL 校验：GET ?encrypt=xxx 返回 { challenge: decrypted }
+  - 事件接收：POST 加密 JSON，解密后解析 im.message.receive_v1 并转发
+  - 需配置 encrypt_key、verification_token、webhook_port
+  - 实际验证需 OpenClaw 以 webhook 模式运行，并配置飞书事件订阅 URL
+}

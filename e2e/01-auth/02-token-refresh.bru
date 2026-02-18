@@ -1,0 +1,99 @@
+meta {
+  name: Token Auto Refresh
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/auth/v3/tenant_access_token/internal
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "app_id": "{{app_id}}",
+    "app_secret": "{{app_secret}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.tenant_access_token: isDefined
+}
+
+script:post-response {
+  // Simulate token refresh scenario
+  const oldToken = bru.getEnvVar("tenant_access_token");
+  const newToken = res.body.tenant_access_token;
+  
+  if (oldToken && newToken && oldToken !== newToken) {
+    console.log("✓ Token refreshed successfully");
+    console.log("  Old:", oldToken.substring(0, 20) + "...");
+    console.log("  New:", newToken.substring(0, 20) + "...");
+  } else if (!oldToken) {
+    console.log("ℹ First token fetch (no old token to compare)");
+  } else {
+    console.log("ℹ Token unchanged (may be cached)");
+  }
+  
+  bru.setEnvVar("tenant_access_token", newToken);
+  bru.setEnvVar("token_refreshed_at", new Date().toISOString());
+}
+
+tests {
+  test("should get new token", function() {
+    expect(res.body.tenant_access_token).to.be.a('string');
+  });
+  
+  test("new token should be valid", function() {
+    expect(res.body.tenant_access_token.length).to.be.greaterThan(20);
+    expect(res.body.expire).to.be.greaterThan(0);
+  });
+  
+  test("should meet performance SLA", function() {
+    expect(res.responseTime).to.be.lessThan(5000);
+  });
+}
+
+docs {
+  # F-008: Token 自动刷新 — Should 级功能
+  
+  **功能需求**: F-008 Token 自动刷新（Should）
+  **场景**: 模拟 token 过期后自动刷新
+  **优先级**: Should
+  
+  ## 测试目的
+  
+  验证 AuthManager 能够在 token 即将过期时自动刷新。
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given tenant_access_token 将在 5 分钟内过期
+  When 发送消息请求
+  Then 自动刷新 token 后重试
+  And 消息发送成功
+  ```
+  
+  ## 测试策略
+  
+  由于无法精确控制飞书 token 过期时间，此测试验证：
+  1. 能够成功获取新 token
+  2. 新 token 与旧 token 不同（如果有旧 token）
+  3. 刷新操作性能符合预期
+  
+  ## 错误码
+  
+  - E-FEISHU-1002: token 过期且刷新失败
+  
+  ## 参考
+  
+  - AuthManager 实现：`clawrs-feishu` (feishu-platform 内 LarkAuthAdapter)
+  - TOKEN_REFRESH_BUFFER_SECS: 300 (5分钟)
+}

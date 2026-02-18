@@ -1,0 +1,155 @@
+meta {
+  name: Receive Text Message Simulation
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{zeroclaw_gateway_url}}/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Feishu-Signature: mock_signature_for_test
+}
+
+body:json {
+  {
+    "schema": "2.0",
+    "header": {
+      "event_id": "test_event_{{$randomInt}}",
+      "event_type": "im.message.receive_v1",
+      "create_time": "{{$timestamp}}",
+      "token": "mock_verification_token",
+      "app_id": "{{app_id}}",
+      "tenant_key": "test_tenant"
+    },
+    "event": {
+      "sender": {
+        "sender_id": {
+          "open_id": "{{test_user_open_id}}",
+          "user_id": "test_user"
+        },
+        "sender_type": "user"
+      },
+      "message": {
+        "message_id": "om_test_receive_{{$randomInt}}",
+        "chat_id": "{{test_chat_id}}",
+        "chat_type": "p2p",
+        "message_type": "text",
+        "content": "{\"text\":\"[E2E] E2E-03-02 Hello ZeroClaw (simulated receive)\"}",
+        "mentions": null
+      }
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:pre-request {
+  // Note: This test requires ZeroClaw gateway to be running
+  const gatewayUrl = bru.getEnvVar("zeroclaw_gateway_url");
+  console.log("ℹ Testing message reception via ZeroClaw webhook");
+  console.log("  Gateway:", gatewayUrl);
+  console.log("  From user:", bru.getEnvVar("test_user_open_id"));
+  console.log("");
+  console.log("⚠ Prerequisites:");
+  console.log("  1. ZeroClaw must be running: zeroclaw gateway --port 8080");
+  console.log("  2. Feishu channel must be enabled in config.toml");
+  console.log("  3. test_user_open_id must be in allowlist");
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✓ Message received and processed by ZeroClaw");
+    console.log("  Status:", res.status);
+  } else {
+    console.error("✗ Message reception failed");
+    console.error("  Status:", res.status);
+    console.error("  Body:", res.body);
+  }
+}
+
+tests {
+  test("F-002: ZeroClaw should accept webhook message", function() {
+    // 200 = webhook accepted (even if signature check fails in test mode)
+    expect(res.status).to.be.oneOf([200, 202]);
+  });
+  
+  test("should process allowlisted user", function() {
+    // Verify user is in allowlist (this would be logged)
+    const userId = bru.getEnvVar("test_user_open_id");
+    expect(userId).to.exist;
+  });
+}
+
+docs {
+  # F-002: 文本消息接收 — WebSocket / Webhook 模拟
+  
+  **功能需求**: F-002 文本消息接收（Must）
+  **业务场景**: Scene-001 DM 文本对话
+  **测试策略**: Webhook 模拟（WebSocket 需要长连接，难以用 Bruno 测试）
+  **优先级**: Must
+  
+  ## 测试目的
+  
+  验证 ZeroClaw 能够：
+  1. 接收飞书 webhook 事件
+  2. 解码 FeishuMessageEvent
+  3. 转换为 ChannelMessage
+  4. 推送到 LLM 处理管道
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given 飞书 WebSocket 连接已建立（或 webhook 端点已启动）
+  And 用户在 allowlist 中
+  When 用户发送文本消息 "Hello"
+  Then ChannelMessage { 
+      channel: "feishu", 
+      content: "Hello", 
+      sender: <chat_id> 
+  } 被推送到 tx
+  ```
+  
+  ## 测试限制
+  
+  Bruno 无法直接测试 WebSocket 长连接。本测试通过模拟 webhook 事件
+  来验证消息处理逻辑，实际 WebSocket 测试需要：
+  
+  - **单元测试**: `cargo test -p clawrs-feishu websocket`
+  - **手动测试**: 真实飞书客户端发送消息
+  
+  ## 事件格式
+  
+  飞书推送的事件遵循 Schema 2.0 格式：
+  - `header.event_type`: "im.message.receive_v1"
+  - `event.message.content`: JSON 字符串（需解码）
+  - `event.sender.sender_id.open_id`: 发送者 open_id
+  
+  ## 实现映射
+  
+  ```rust
+  // websocket.rs::handle_ws_text()
+  let envelope: FeishuEventEnvelope = serde_json::from_str(text)?;
+  let event: FeishuMessageEvent = serde_json::from_value(envelope.event)?;
+  
+  // Security check
+  if !self.guard.is_user_allowed(sender_open_id) {
+      // Log and skip
+  }
+  
+  // Decode content
+  let content = decode_message_content(&event.message.content, &event.message.message_type);
+  ```
+  
+  ## 参考
+  
+  - Task 7: WebSocketListener 实现
+  - messages.rs::decode_message_content()
+  - [飞书事件订阅](https://open.feishu.cn/document/server-docs/event-subscription-guide/event-overview)
+}

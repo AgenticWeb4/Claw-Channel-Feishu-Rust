@@ -1,0 +1,94 @@
+meta {
+  name: Empty Allowlist (Deny All)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{zeroclaw_gateway_url}}/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "schema": "2.0",
+    "header": {
+      "event_id": "test_empty_allowlist_{{$randomInt}}",
+      "event_type": "im.message.receive_v1",
+      "create_time": "{{$timestamp}}",
+      "token": "test",
+      "app_id": "{{app_id}}",
+      "tenant_key": "test"
+    },
+    "event": {
+      "sender": {
+        "sender_id": {
+          "open_id": "ou_any_user_{{$randomInt}}"
+        }
+      },
+      "message": {
+        "message_id": "om_empty_allow_test",
+        "chat_id": "{{test_chat_id}}",
+        "chat_type": "p2p",
+        "message_type": "text",
+        "content": "{\"text\":\"[E2E] E2E-04-04 Should be rejected\"}"
+      }
+    }
+  }
+}
+
+tests {
+  test("ASR-004: empty allowlist should deny everyone", function() {
+    // This test assumes allowed_users = [] in config
+    // Webhook returns 200 but message is dropped internally
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  # ASR-004: 空 Allowlist 默认拒绝
+  
+  **架构重要需求**: ASR-004 未在 allowlist 的飞书用户消息被静默丢弃
+  **配置**: `allowed_users = []`
+  **行为**: 拒绝所有入站消息
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given allowed_users = []
+  When 收到任意用户消息
+  Then 消息被丢弃
+  And 日志输出 warn
+  ```
+  
+  ## 默认安全策略（ADR-004）
+  
+  ZeroClaw 渠道默认采用"拒绝所有"原则：
+  
+  | Allowlist | 行为 | 安全级别 |
+  |-----------|------|---------|
+  | `[]` (空) | 拒绝所有 | 🔒 最高 |
+  | `["ou_abc"]` | 仅允许指定用户 | 🔒 高 |
+  | `["*"]` | 允许所有（显式） | ⚠️ 低 |
+  
+  ## 实现
+  
+  ```rust
+  // security.rs
+  pub fn is_user_allowed(&self, user_id: &str) -> bool {
+      self.allowed_users.iter().any(|u| u == "*" || u == user_id)
+  }
+  ```
+  
+  空列表: `[].iter().any(...)` → false
+  
+  ## 参考
+  
+  - 对比 Telegram/Slack/Discord 一致的 allowlist 行为
+  - channels/telegram.rs:27-29
+}

@@ -1,0 +1,103 @@
+meta {
+  name: open-lark IM Send Message
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-07-02 open-lark SDK integration test - {{$timestamp}}\"}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.data.message_id: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    const msgId = res.body.data?.message_id;
+    bru.setEnvVar("last_sent_message_id", msgId);
+    console.log("✓ Message sent via open-lark IM path");
+    console.log("  Message ID:", msgId);
+    console.log("");
+    console.log("ℹ open-lark SDK equivalent:");
+    console.log("  CreateMessageRequest::builder()");
+    console.log("    .receive_id_type(\"chat_id\")");
+    console.log("    .request_body(CreateMessageRequestBody::builder()");
+    console.log("      .receive_id(chat_id).msg_type(\"text\").content(encoded).build())");
+    console.log("    .build()");
+    console.log("  client.im.v1.message.create(request, None).await");
+  } else {
+    console.error("✗ IM send failed:", res.body.code, res.body.msg);
+  }
+}
+
+tests {
+  test("open-lark: im.v1.message.create should succeed", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data).to.have.property('message_id');
+  });
+
+  test("open-lark: message_id should follow Feishu format", function() {
+    const msgId = res.body.data.message_id;
+    expect(msgId).to.match(/^om_/);
+  });
+
+  test("open-lark: should include sender info in response", function() {
+    // Feishu returns the created message with sender = bot
+    if (res.body.data && res.body.data.sender) {
+      expect(res.body.data.sender.id).to.be.a('string');
+      expect(res.body.data.sender.sender_type).to.equal('app');
+    }
+  });
+
+  test("open-lark: performance within SDK overhead budget", function() {
+    // SDK adds minimal overhead (~5ms) over raw HTTP
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # open-lark IM v1 Message Send Validation
+
+  Validates the exact API path used by open-lark's IM service.
+
+  ## Architecture mapping
+
+  ```
+  clawrs-feishu (facade)
+    └─ feishu-platform (capability)
+       └─ LarkImAdapter (adapter)
+          └─ open-lark: client.im.v1.message.create(request, None)
+             └─ POST /open-apis/im/v1/messages?receive_id_type=chat_id
+  ```
+
+  ## Content encoding (im::codec)
+
+  open-lark expects `content` as a JSON string:
+  ```rust
+  fn encode_text_message(text: &str) -> String {
+      serde_json::json!({"text": text}).to_string()
+  }
+  ```
+}

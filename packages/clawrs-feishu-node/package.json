@@ -1,0 +1,39 @@
+{
+  "name": "clawrs-feishu-node",
+  "version": "1.3.0",
+  "description": "Node.js bindings for clawrs-feishu via napi-rs",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "clawrs_feishu_node",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "x86_64-apple-darwin",
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi build --platform --release"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

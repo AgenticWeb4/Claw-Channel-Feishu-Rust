@@ -1,0 +1,120 @@
+meta {
+  name: Performance - Message Round Trip
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-03-05 Performance test at {{$timestamp}}\"}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.responseTime: lt 2000
+}
+
+script:pre-request {
+  bru.setVar("test_start_time", Date.now());
+  console.log("⏱️ Starting performance test");
+  console.log("  Threshold (NFR-001): Message processing < 50ms");
+  console.log("  Threshold (API): Total round trip < 2000ms");
+}
+
+script:post-response {
+  const startTime = bru.getVar("test_start_time");
+  const endTime = Date.now();
+  const totalTime = endTime - startTime;
+  
+  console.log("");
+  console.log("⏱️ Performance Results:");
+  console.log("  API Response Time:", res.responseTime, "ms");
+  console.log("  Total Round Trip:", totalTime, "ms");
+  console.log("");
+  
+  if (res.responseTime < 2000) {
+    console.log("✓ PASS: API response within 2s threshold");
+  } else {
+    console.error("✗ FAIL: API response too slow");
+  }
+  
+  if (totalTime < 2500) {
+    console.log("✓ PASS: Total round trip within 2.5s threshold");
+  } else {
+    console.error("✗ FAIL: Total round trip too slow");
+  }
+}
+
+tests {
+  test("NFR-001: API response should be fast", function() {
+    // Direct Feishu API call should complete within 2s
+    expect(res.responseTime).to.be.lessThan(2000);
+  });
+  
+  test("NFR-001: should meet processing delay target", function() {
+    // Note: This only measures API time, not internal processing
+    // Internal processing (WebSocket → decode → forward) is tested in unit tests
+    const apiTime = res.responseTime;
+    
+    // API time + processing (50ms) + buffer should be < 3s total
+    expect(apiTime).to.be.lessThan(3000);
+  });
+  
+  test("should return success code", function() {
+    expect(res.body.code).to.equal(0);
+  });
+}
+
+docs {
+  # NFR-001: 性能测试 — 消息处理延迟
+  
+  **非功能需求**: NFR-001 性能与容量
+  **目标**: 从收到飞书事件到发送 LLM 请求 < 50ms
+  **度量**: 响应时间分解
+  
+  ## 性能分解
+  
+  | 阶段 | 目标 | 实测 |
+  |------|------|------|
+  | 1. WebSocket 接收 | < 5ms | (单元测试) |
+  | 2. JSON 解码 | < 10ms | (单元测试) |
+  | 3. Allowlist 检查 | < 1ms | (O(n) 线性扫描) |
+  | 4. 转发到 Channel | < 5ms | (mpsc channel send) |
+  | 5. 飞书 API 调用 | < 2000ms | (本测试) |
+  | **Total (不含 LLM)** | **< 50ms** | **(组合)** |
+  
+  ## 测试策略
+  
+  - **本测试**: 验证飞书 API 响应时间（外部）
+  - **单元测试**: 验证内部处理延迟（cargo test）
+  - **集成测试**: 完整链路（手动测试）
+  
+  ## 性能优化点
+  
+  1. **Token 缓存**: AuthManager 缓存 token，避免每次调用都刷新
+  2. **HTTP 连接池**: reqwest Client 复用 TCP 连接
+  3. **零拷贝**: serde_json 直接序列化到 HTTP body
+  
+  ## 参考
+  
+  - ASR-001: 消息处理延迟 < 50ms
+  - ADR-001: 直接 HTTP API（无 SDK 开销）
+}

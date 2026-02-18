@@ -1,0 +1,104 @@
+meta {
+  name: Get Bot Info
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis/bot/v3/info
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.bot: isDefined
+  res.body.bot.open_id: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:pre-request {
+  // Ensure we have a valid token
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("No tenant_access_token found. Run 01-auth/01-get-token.bru first.");
+  }
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    const botOpenId = res.body.bot?.open_id;
+    if (botOpenId) {
+      bru.setEnvVar("bot_open_id", botOpenId);
+      console.log("✓ Bot info retrieved successfully");
+      console.log("  Bot Open ID:", botOpenId);
+      console.log("  Bot Name:", res.body.bot?.app_name || "N/A");
+      console.log("  Bot Status:", res.body.bot?.status || "N/A");
+    }
+  } else {
+    console.error("✗ Failed to get bot info:", res.body.msg);
+  }
+}
+
+tests {
+  test("should return bot information", function() {
+    expect(res.body).to.have.property('bot');
+    expect(res.body.bot).to.have.property('open_id');
+    expect(res.body.bot).to.have.property('app_name');
+  });
+  
+  test("bot open_id should be valid format", function() {
+    const openId = res.body.bot.open_id;
+    expect(openId).to.be.a('string');
+    expect(openId).to.match(/^ou_/);
+  });
+  
+  test("should meet performance requirement", function() {
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # F-006: 渠道健康检查 — 获取 Bot 信息
+  
+  **功能需求**: F-006 渠道健康检查（Must）
+  **业务场景**: Scene-003 渠道健康检查
+  **优先级**: Must
+  
+  ## 测试目的
+  
+  验证：
+  1. 能够通过 tenant_access_token 获取 bot 信息
+  2. bot open_id 格式正确（ou_前缀）
+  3. 为后续群聊 @mention 测试准备 bot_open_id
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given 飞书已配置
+  When 执行 GET /bot/v3/info
+  Then 返回 bot 信息
+  And bot.open_id 以 "ou_" 开头
+  ```
+  
+  ## Bot Open ID 用途
+  
+  - 群聊消息过滤：忽略 bot 自己发送的消息
+  - @mention 检测：判断是否 @了机器人
+  - WebSocket 监听器初始化：`resolve_bot_id()`
+  
+  ## 错误码
+  
+  - `code=99991663` — app 权限不足
+  - `code=99991668` — token 无效
+  
+  ## 参考
+  
+  - WebSocketListener::resolve_bot_id() 实现
+  - [飞书 Bot API](https://open.feishu.cn/document/server-docs/bot-v3/bot-overview)
+}

@@ -1,0 +1,67 @@
+meta {
+  name: ZeroClaw Gateway Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{zeroclaw_gateway_url}}/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.responseTime: lt 1000
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✓ ZeroClaw gateway is healthy");
+    console.log("  URL:", bru.getEnvVar("zeroclaw_gateway_url"));
+    console.log("  Response time:", res.responseTime, "ms");
+  } else {
+    console.error("✗ ZeroClaw gateway is DOWN");
+    console.error("  URL:", bru.getEnvVar("zeroclaw_gateway_url"));
+    console.error("  Status:", res.status);
+    console.error("");
+    console.error("Start gateway: zeroclaw gateway --port 8080");
+  }
+}
+
+tests {
+  test("gateway should be running", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("health check should be fast", function() {
+    // Health endpoint should respond instantly
+    expect(res.responseTime).to.be.lessThan(1000);
+  });
+}
+
+docs {
+  # ZeroClaw Gateway 健康检查
+  
+  **测试目的**: 验证 ZeroClaw gateway 已启动且可接受请求
+  
+  ## 前置条件
+  
+  ```bash
+  # 启动 ZeroClaw gateway
+  cd /Users/WORKS/MyProject/MyAIClaw/zeroclaw
+  cargo build --release --features feishu
+  ./target/release/zeroclaw gateway --port 8080
+  ```
+  
+  ## /health 端点
+  
+  - 无需认证（public endpoint）
+  - 返回 200 = 网关运行中
+  - 不泄露敏感信息
+  
+  ## 参考
+  
+  - gateway/mod.rs::health_handler()
+  - README.md Gateway API 章节
+}

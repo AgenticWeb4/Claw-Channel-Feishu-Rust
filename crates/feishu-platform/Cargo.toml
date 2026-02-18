@@ -1,0 +1,19 @@
+[package]
+name = "feishu-platform"
+description = "Feishu adapters: Auth, IM, Bot, Event (open-lark SDK wrappers)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+feishu-domain = { workspace = true }
+feishu-kernel = { workspace = true }
+open-lark = { workspace = true, features = ["im", "authentication", "websocket", "bot"] }
+tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros", "time"] }
+async-trait = { workspace = true }
+serde = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

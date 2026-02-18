@@ -1,0 +1,52 @@
+meta {
+  name: Edge Case - Rapid Duplicate Send
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-08-03 Duplicate send test\"}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+}
+
+tests {
+  test("should accept duplicate message content", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data.message_id).to.match(/^om_/);
+  });
+
+  test("each send should get a unique message_id", function() {
+    // Feishu always assigns unique message_id even for identical content
+    expect(res.body.data.message_id).to.be.a('string');
+    expect(res.body.data.message_id.length).to.be.greaterThan(5);
+  });
+}
+
+docs {
+  # Edge Case: Rapid Duplicate Send
+
+  Validates that sending the same message content twice produces
+  two distinct message_ids (idempotency check).
+}

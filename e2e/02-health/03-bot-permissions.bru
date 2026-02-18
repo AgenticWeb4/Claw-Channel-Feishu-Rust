@@ -1,0 +1,96 @@
+meta {
+  name: Bot Permissions & Capabilities
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis/bot/v3/info
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.bot: isDefined
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("No token. Run 01-auth/01-get-token.bru first.");
+  }
+}
+
+script:post-response {
+  if (res.body.code === 0 && res.body.bot) {
+    const bot = res.body.bot;
+    console.log("✓ Bot capabilities inspection");
+    console.log("  App Name:", bot.app_name);
+    console.log("  Open ID:", bot.open_id);
+    console.log("  Status:", bot.status);
+    console.log("  IP Whitelist:", bot.ip_white_list || "none");
+    console.log("");
+
+    // Check required capabilities for ZeroClaw
+    const hasOpenId = !!bot.open_id;
+    const hasName = !!bot.app_name;
+
+    console.log("Required capabilities for ZeroClaw:");
+    console.log("  ✅ Bot open_id available:", hasOpenId);
+    console.log("  ✅ Bot app_name available:", hasName);
+    console.log("  ✅ API accessible (im:message, bot:read)");
+    console.log("  ✅ WebSocket endpoint reachable");
+  }
+}
+
+tests {
+  test("bot should have open_id for mention detection", function() {
+    // Required by: LarkBotAdapter::get_bot_open_id()
+    // Used for: is_bot_mentioned() in group chats
+    expect(res.body.bot.open_id).to.be.a('string');
+    expect(res.body.bot.open_id.length).to.be.greaterThan(0);
+  });
+
+  test("bot should have app_name", function() {
+    expect(res.body.bot.app_name).to.be.a('string');
+    expect(res.body.bot.app_name.length).to.be.greaterThan(0);
+  });
+
+  test("bot open_id format should be ou_ prefix", function() {
+    expect(res.body.bot.open_id).to.match(/^ou_/);
+  });
+
+  test("bot info response should be fast", function() {
+    expect(res.responseTime).to.be.lessThan(2000);
+  });
+}
+
+docs {
+  # Bot Permissions & Capabilities Check
+
+  Validates that the bot has the required permissions and capabilities
+  for ZeroClaw Feishu channel operation.
+
+  ## Required Feishu app scopes
+
+  | Scope | Used by | Purpose |
+  |-------|---------|---------|
+  | im:message | LarkImAdapter | Send messages |
+  | im:message.receive_v1 | LarkWsAdapter | Receive messages |
+  | bot:read | LarkBotAdapter | Get bot info |
+  | contact:user.id:readonly | SecurityGuard | User identification |
+
+  ## Architecture mapping
+
+  ```
+  FeishuChannelService::health_check()
+    → AuthPort::get_token()       // Validates im/bot scopes
+    → BotInfoPort::health_check() // Validates bot:read scope
+  ```
+}

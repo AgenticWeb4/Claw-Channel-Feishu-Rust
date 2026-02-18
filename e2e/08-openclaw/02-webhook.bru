@@ -1,0 +1,77 @@
+meta {
+  name: OpenClaw Webhook Message Forward
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{openclaw_gateway_url}}/webhook
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: test_bearer_token_replace_with_real
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "message": "Test message from Bruno to OpenClaw",
+    "channel": "feishu",
+    "sender": "{{test_user_open_id}}"
+  }
+}
+
+assert {
+  res.status: gt 0
+}
+
+script:pre-request {
+  console.log("ℹ Testing OpenClaw webhook integration");
+  console.log("  Endpoint:", bru.getEnvVar("openclaw_gateway_url") + "/webhook");
+  console.log("");
+  console.log("⚠ Note: This requires:");
+  console.log("  1. OpenClaw gateway running");
+  console.log("  2. Valid bearer token (if pairing required)");
+  console.log("  3. Feishu channel configured in OpenClaw");
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 202) {
+    console.log("✓ Message forwarded to OpenClaw");
+    console.log("  Status:", res.status);
+  } else if (res.status === 401) {
+    console.error("✗ Unauthorized - missing or invalid bearer token");
+  } else if (res.status === 403) {
+    console.error("✗ Forbidden - pairing required");
+  } else {
+    console.error("✗ Webhook failed:", res.status);
+  }
+}
+
+tests {
+  test("should accept or reject webhook message", function() {
+    // 200/202=accepted, 400/401/403=rejected, 405=OpenClaw has no POST /webhook (uses WS)
+    expect(res.status).to.be.oneOf([200, 202, 400, 401, 403, 405]);
+  });
+}
+
+docs {
+  # OpenClaw Webhook 集成测试
+
+  **测试目的**: 验证 OpenClaw gateway webhook 端点能够接收飞书消息
+
+  ## Webhook Payload 格式
+
+  ```json
+  {
+    "message": "消息内容",
+    "channel": "feishu",
+    "sender": "chat_id 或 open_id"
+  }
+  ```
+}

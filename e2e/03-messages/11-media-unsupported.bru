@@ -1,0 +1,14 @@
+meta {
+  name: Media Unsupported (Placeholder)
+  type: http
+  seq: 11
+}
+
+docs {
+  # 媒体能力占位
+
+  验证 clawrs-feishu 对媒体请求的处理：
+  - Node 桥接 sendMedia 在 mediaUrl 存在时返回 { ok: false, error: 'Media not yet supported' }
+  - 媒体功能路线图见 README
+  - 本测试为文档占位；实际验证需通过 OpenClaw gateway 调用 sendMedia
+}

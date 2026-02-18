@@ -1,0 +1,122 @@
+meta {
+  name: Get WebSocket Endpoint
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{feishu_base_url}}/callback/ws/endpoint
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  locale: zh
+}
+
+body:json {
+  {
+    "AppID": "{{app_id}}",
+    "AppSecret": "{{app_secret}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:pre-request {
+  const appId = bru.getEnvVar("app_id");
+  const appSecret = bru.getEnvVar("app_secret");
+  if (!appId || !appSecret) {
+    throw new Error("app_id or app_secret not configured in environment");
+  }
+  
+  console.log("ℹ Requesting WebSocket endpoint URL");
+  console.log("  Endpoint: /callback/ws/endpoint (NOT /open-apis/)");
+  console.log("  Auth: AppID + AppSecret in body (NOT Bearer token)");
+}
+
+script:post-response {
+  if (res.body && res.body.code === 0) {
+    const wsUrl = res.body.data?.URL || res.body.data?.url;
+    if (wsUrl) {
+      bru.setEnvVar("ws_endpoint_url", wsUrl);
+      console.log("✓ WebSocket endpoint URL obtained");
+      console.log("  URL:", wsUrl.substring(0, 80) + "...");
+      console.log("  Protocol:", wsUrl.startsWith("wss://") ? "WSS (secure)" : "WS");
+    }
+    
+    const clientConfig = res.body.data?.ClientConfig;
+    if (clientConfig) {
+      console.log("  PingInterval:", clientConfig.PingInterval, "s");
+      console.log("  ReconnectCount:", clientConfig.ReconnectCount);
+      console.log("  ReconnectInterval:", clientConfig.ReconnectInterval, "s");
+    }
+  } else if (res.status === 404) {
+    console.error("✗ 404: Wrong URL path. Use /callback/ws/endpoint (no /open-apis/ prefix)");
+  } else {
+    console.error("✗ Failed:", res.body?.code, res.body?.msg || res.status);
+  }
+}
+
+tests {
+  test("F-001: should get WebSocket endpoint", function() {
+    expect(res.body.code).to.equal(0);
+  });
+  
+  test("endpoint URL should be valid WSS", function() {
+    const url = res.body.data?.URL || res.body.data?.url;
+    expect(url).to.be.a('string');
+    expect(url).to.match(/^wss:\/\//);
+  });
+  
+  test("should return ClientConfig for connection management", function() {
+    const config = res.body.data?.ClientConfig;
+    expect(config).to.exist;
+    expect(config.PingInterval).to.be.greaterThan(0);
+    expect(config.ReconnectCount).to.not.equal(0);
+  });
+  
+  test("should meet performance requirement", function() {
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # F-001: WebSocket endpoint - Get WS URL
+  
+  IMPORTANT: This API is NOT under /open-apis/. The correct path is:
+    POST {domain}/callback/ws/endpoint
+  
+  Auth is via AppID + AppSecret in the JSON body (NOT Bearer token).
+  This was discovered by reading the @larksuiteoapi/node-sdk WSClient source.
+  
+  ## Request format (from Lark SDK source)
+  
+  ```json
+  POST https://open.feishu.cn/callback/ws/endpoint
+  Headers: { "locale": "zh" }
+  Body: { "AppID": "cli_xxx", "AppSecret": "xxx" }
+  ```
+  
+  ## Response
+  
+  ```json
+  {
+    "code": 0,
+    "data": {
+      "URL": "wss://...",
+      "ClientConfig": {
+        "PingInterval": 120,
+        "ReconnectCount": 120,
+        "ReconnectInterval": 2,
+        "ReconnectNonce": 2
+      }
+    }
+  }
+  ```
+}

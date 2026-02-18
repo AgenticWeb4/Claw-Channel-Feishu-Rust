@@ -1,0 +1,90 @@
+meta {
+  name: Wildcard Allowlist
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{zeroclaw_gateway_url}}/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "schema": "2.0",
+    "header": {
+      "event_id": "test_wildcard_{{$randomInt}}",
+      "event_type": "im.message.receive_v1",
+      "create_time": "{{$timestamp}}",
+      "token": "test",
+      "app_id": "{{app_id}}",
+      "tenant_key": "test"
+    },
+    "event": {
+      "sender": {
+        "sender_id": {
+          "open_id": "ou_random_user_{{$randomInt}}"
+        }
+      },
+      "message": {
+        "message_id": "om_wildcard_test",
+        "chat_id": "{{test_chat_id}}",
+        "chat_type": "p2p",
+        "message_type": "text",
+        "content": "{\"text\":\"[E2E] E2E-04-03 Test wildcard access\"}"
+      }
+    }
+  }
+}
+
+tests {
+  test("wildcard should allow any user", function() {
+    // This test assumes allowed_users = ["*"] in config
+    // If using specific allowlist, this test will fail (expected)
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  # Wildcard Allowlist — 开放模式
+  
+  **配置**: `allowed_users = ["*"]`
+  **场景**: 允许所有用户访问（显式 opt-in）
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given allowed_users = ["*"]
+  When 收到来自任意 open_id 的消息
+  Then 消息被处理
+  ```
+  
+  ## 安全警告
+  
+  通配符模式 `["*"]` 应仅用于：
+  - 测试环境
+  - 受信任的内网环境
+  - 临时开放测试
+  
+  生产环境建议：
+  - 使用精确 open_id 白名单
+  - 或使用 pairing 模式（OpenClaw 风格）
+  
+  ## 实现
+  
+  ```rust
+  pub fn is_user_allowed(&self, user_id: &str) -> bool {
+      self.allowed_users.iter().any(|u| u == "*" || u == user_id)
+  }
+  ```
+  
+  ## 参考
+  
+  - NFR-004: 安全策略
+  - Task 4: SecurityGuard
+}

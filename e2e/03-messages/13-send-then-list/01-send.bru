@@ -1,0 +1,60 @@
+meta {
+  name: Phase1 Send (自闭环-发送)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-BI-01 自闭环测试\"}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.data.message_id: isDefined
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("No token. Run 01-auth first.");
+  }
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    const msgId = res.body.data?.message_id;
+    bru.setEnvVar("phase1_message_id", msgId);
+    console.log("✓ Phase1 send OK");
+    console.log("  message_id:", msgId);
+  }
+}
+
+tests {
+  test("should send Phase1 message", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data.message_id).to.match(/^om_/);
+  });
+}
+
+docs {
+  Phase 1 发送：发送 [E2E] E2E-BI-01，保存 message_id 供 02-list 验证。
+}

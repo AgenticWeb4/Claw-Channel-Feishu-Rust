@@ -1,0 +1,50 @@
+meta {
+  name: Edge Case - Missing Required Fields
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text"
+  }
+}
+
+tests {
+  test("should reject request with missing content field", function() {
+    // Feishu requires content field for text messages
+    expect(res.body.code).to.not.equal(0);
+  });
+
+  test("should return descriptive error", function() {
+    expect(res.body.msg).to.be.a('string');
+    expect(res.body.msg.length).to.be.greaterThan(0);
+  });
+
+  test("should respond within timeout", function() {
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # Edge Case: Missing Required Fields
+
+  Validates Feishu API error handling when the `content` field
+  is omitted from a message send request.
+  Maps to `feishu-domain::error::FeishuError::MessageSendFailed`.
+}

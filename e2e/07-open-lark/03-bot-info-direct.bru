@@ -1,0 +1,96 @@
+meta {
+  name: open-lark Bot Info (Direct HTTP)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis/bot/v3/info
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.bot: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:post-response {
+  if (res.body.code === 0 && res.body.bot) {
+    const bot = res.body.bot;
+    bru.setEnvVar("bot_open_id", bot.open_id);
+    console.log("✓ Bot info retrieved (direct HTTP workaround)");
+    console.log("  Bot Name:", bot.app_name);
+    console.log("  Bot Open ID:", bot.open_id);
+    console.log("  Bot Status:", bot.status);
+    console.log("");
+    console.log("ℹ Architecture note:");
+    console.log("  open-lark BaseResponse<T> expects data.bot,");
+    console.log("  but /bot/v3/info returns bot at root level.");
+    console.log("  LarkBotAdapter uses direct HTTP + custom BotInfoResponse.");
+  }
+}
+
+tests {
+  test("open-lark: bot.open_id should be available", function() {
+    expect(res.body.bot).to.have.property('open_id');
+    expect(res.body.bot.open_id).to.match(/^ou_/);
+  });
+
+  test("open-lark: response structure uses root-level bot (not data.bot)", function() {
+    // This validates the known open-lark SDK limitation:
+    // BaseResponse<T> expects { code, msg, data: { bot: ... } }
+    // But actual API returns { code, msg, bot: { ... } }
+    expect(res.body).to.have.property('bot');
+    expect(res.body).to.not.have.property('data');
+  });
+
+  test("open-lark: bot should have required fields", function() {
+    const bot = res.body.bot;
+    expect(bot).to.have.property('app_name');
+    expect(bot).to.have.property('open_id');
+  });
+
+  test("open-lark: direct HTTP fallback performance", function() {
+    expect(res.responseTime).to.be.lessThan(2000);
+  });
+}
+
+docs {
+  # open-lark Bot Info - Direct HTTP Workaround
+
+  This test validates the direct HTTP approach used by LarkBotAdapter,
+  which bypasses open-lark's generic BaseResponse<T> deserialization
+  because the /bot/v3/info API returns `bot` at root level instead of
+  under a `data` key.
+
+  ## Architecture mapping
+
+  ```
+  clawrs-feishu (facade)
+    └─ feishu-platform (capability)
+       └─ LarkBotAdapter (adapter)
+          └─ NOT: client.bot.v3.bot_info.get()  // BaseResponse mismatch
+          └─ YES: client.config.http_client.get("/open-apis/bot/v3/info")
+                  + custom BotInfoResponse { code, msg, bot }
+  ```
+
+  ## Known issue
+
+  open-lark v0.14 `BaseResponse<T>` deserializes:
+  ```json
+  { "code": 0, "msg": "", "data": { ... } }
+  ```
+  But /bot/v3/info actually returns:
+  ```json
+  { "code": 0, "msg": "ok", "bot": { "open_id": "ou_xxx", ... } }
+  ```
+
+  LarkBotAdapter works around this with direct HTTP and custom struct.
+}

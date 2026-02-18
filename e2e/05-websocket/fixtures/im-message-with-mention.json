@@ -1,0 +1,43 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt_ws_mention_001",
+    "event_type": "im.message.receive_v1",
+    "create_time": "1719211482724",
+    "token": "",
+    "app_id": "cli_test",
+    "tenant_key": "tenant_001"
+  },
+  "event": {
+    "sender": {
+      "sender_id": {
+        "open_id": "ou_sender_001",
+        "union_id": "on_union_sender",
+        "user_id": "usr_sender"
+      },
+      "sender_type": "user",
+      "tenant_key": "tenant_001"
+    },
+    "message": {
+      "message_id": "om_msg_mention_001",
+      "chat_id": "oc_chat_001",
+      "chat_type": "group",
+      "message_type": "text",
+      "content": "{\"text\":\"@Bot 请回复\"}",
+      "mentions": [
+        {
+          "key": "@_user_1",
+          "id": {
+            "open_id": "ou_bot_open_id",
+            "union_id": "on_bot_union",
+            "user_id": "usr_bot"
+          },
+          "name": "Bot",
+          "tenant_key": "tenant_001"
+        }
+      ],
+      "create_time": "1719211482488",
+      "update_time": "1719211482488"
+    }
+  }
+}

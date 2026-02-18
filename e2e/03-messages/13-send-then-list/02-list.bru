@@ -1,0 +1,69 @@
+meta {
+  name: Phase1 List (自闭环-拉取验证)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?container_id_type=chat&container_id={{test_chat_id}}&page_size=20&sort_type=ByCreateTimeDesc
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.data.items: isDefined
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  const msgId = bru.getEnvVar("phase1_message_id");
+  if (!token) {
+    throw new Error("No token. Run 01-auth first.");
+  }
+  if (!msgId) {
+    throw new Error("No phase1_message_id. Run 01-send first.");
+  }
+}
+
+script:post-response {
+  const msgId = bru.getEnvVar("phase1_message_id");
+  const items = res.body?.data?.items ?? [];
+  const found = items.some((m) => m.message_id === msgId);
+  if (found) {
+    console.log("✓ Phase1 list OK: message_id found in items");
+  } else {
+    console.error("✗ phase1_message_id not found in items");
+    console.error("  Expected:", msgId);
+    console.error("  Items count:", items.length);
+  }
+}
+
+tests {
+  test("should return list with items", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data).to.have.property("items");
+  });
+
+  test("sent message should appear in list", function() {
+    const msgId = bru.getEnvVar("phase1_message_id");
+    const items = res.body?.data?.items ?? [];
+    const found = items.some((m) => m.message_id === msgId);
+    expect(found).to.be.true;
+  });
+}
+
+docs {
+  Phase 1 拉取：GET list messages，断言 phase1_message_id 在 items 中。
+  飞书 API: GET /open-apis/im/v1/messages
+  需 im:message:read 权限。
+}

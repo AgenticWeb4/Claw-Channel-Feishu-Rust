@@ -1,0 +1,57 @@
+meta {
+  name: Edge Case - Expired/Invalid Token
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: t-expired_fake_token_12345
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"should not arrive\"}"
+  }
+}
+
+tests {
+  test("should reject expired/invalid token", function() {
+    // Feishu returns error for invalid tokens
+    expect(res.body.code).to.not.equal(0);
+  });
+
+  test("should return auth-related error code", function() {
+    // 99991668 = invalid access token
+    // 99991663 = token expired
+    expect(res.body.code).to.be.greaterThan(0);
+  });
+
+  test("should include error message", function() {
+    expect(res.body.msg).to.be.a('string');
+    expect(res.body.msg.length).to.be.greaterThan(0);
+  });
+
+  test("should respond quickly even on auth error", function() {
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # Edge Case: Expired/Invalid Token
+
+  Validates E-FEISHU-1001/1002 error handling when using an
+  expired or malformed tenant_access_token.
+  Maps to `feishu-domain::error::FeishuError::TokenFetchFailed`.
+}

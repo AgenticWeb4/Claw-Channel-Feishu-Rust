@@ -1,0 +1,85 @@
+meta {
+  name: Send Unicode & CJK Message
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-03-07 Unicode 测试 🤖\\n中文: 飞书渠道多模块六边型架构\\n日本語: ゼロクロー\\nEmoji: 🦞🔥✅❌⚡️\\n特殊字符: <>&\\\"'`${}[]\"}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.data.message_id: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    console.log("✓ Unicode message sent successfully");
+    console.log("  Message ID:", res.body.data?.message_id);
+    console.log("  Includes: CJK, Emoji, special chars");
+  } else {
+    console.error("✗ Unicode message failed:", res.body.code, res.body.msg);
+  }
+}
+
+tests {
+  test("should send CJK + emoji + special chars", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.data.message_id).to.match(/^om_/);
+  });
+
+  test("message should be created without encoding errors", function() {
+    expect(res.body.data).to.have.property('message_id');
+    expect(res.body.data).to.have.property('sender');
+  });
+
+  test("should handle special characters in JSON content", function() {
+    // Feishu content field is JSON-encoded string with escaped quotes
+    // If encoding fails, code != 0
+    expect(res.body.code).to.equal(0);
+  });
+}
+
+docs {
+  # Unicode / CJK / Emoji Message Encoding Test
+
+  Validates that the content encoding pipeline (encode_text_message)
+  correctly handles multibyte characters and special JSON characters.
+
+  ## Architecture mapping
+
+  ```
+  feishu-platform::im::codec::encode_text_message(text)
+    → serde_json::json!({"text": text}).to_string()
+    → POST im/v1/messages with content field
+  ```
+
+  ## Edge cases covered
+
+  - Chinese (CJK Unified Ideographs)
+  - Japanese (Katakana)
+  - Emoji (surrogate pairs)
+  - HTML special chars: < > & " '
+  - Shell special chars: $ {} [] `
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt_ws_audio_001",
+    "event_type": "im.message.receive_v1",
+    "create_time": "1719211482728",
+    "token": "",
+    "app_id": "cli_test",
+    "tenant_key": "tenant_001"
+  },
+  "event": {
+    "sender": {
+      "sender_id": {
+        "open_id": "ou_user_audio",
+        "union_id": "on_union_audio",
+        "user_id": "usr_audio"
+      },
+      "sender_type": "user",
+      "tenant_key": "tenant_001"
+    },
+    "message": {
+      "message_id": "om_msg_audio_001",
+      "chat_id": "oc_chat_001",
+      "chat_type": "p2p",
+      "message_type": "audio",
+      "content": "{\"file_key\":\"audio_xxx\"}",
+      "create_time": "1719211482493",
+      "update_time": "1719211482493"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt_ws_post_001",
+    "event_type": "im.message.receive_v1",
+    "create_time": "1719211482722",
+    "token": "",
+    "app_id": "cli_test",
+    "tenant_key": "tenant_001"
+  },
+  "event": {
+    "sender": {
+      "sender_id": {
+        "open_id": "ou_test_user_002",
+        "union_id": "on_union_002",
+        "user_id": "usr_002"
+      },
+      "sender_type": "user",
+      "tenant_key": "tenant_001"
+    },
+    "message": {
+      "message_id": "om_msg_post_001",
+      "chat_id": "oc_chat_001",
+      "chat_type": "group",
+      "message_type": "post",
+      "content": "{\"zh_cn\":{\"content\":[[{\"tag\":\"text\",\"text\":\"富文本\"},{\"tag\":\"a\",\"text\":\"链接\",\"href\":\"https://example.com\"}]]}}",
+      "create_time": "1719211482486",
+      "update_time": "1719211482486"
+    }
+  }
+}

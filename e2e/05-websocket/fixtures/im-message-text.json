@@ -1,0 +1,31 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt_ws_text_001",
+    "event_type": "im.message.receive_v1",
+    "create_time": "1719211482721",
+    "token": "",
+    "app_id": "cli_test",
+    "tenant_key": "tenant_001"
+  },
+  "event": {
+    "sender": {
+      "sender_id": {
+        "open_id": "ou_test_user_001",
+        "union_id": "on_union_001",
+        "user_id": "usr_001"
+      },
+      "sender_type": "user",
+      "tenant_key": "tenant_001"
+    },
+    "message": {
+      "message_id": "om_msg_text_001",
+      "chat_id": "oc_chat_001",
+      "chat_type": "group",
+      "message_type": "text",
+      "content": "{\"text\":\"Hello from fixture\"}",
+      "create_time": "1719211482485",
+      "update_time": "1719211482485"
+    }
+  }
+}

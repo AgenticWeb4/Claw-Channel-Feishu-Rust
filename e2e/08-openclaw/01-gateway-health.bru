@@ -1,0 +1,56 @@
+meta {
+  name: OpenClaw Gateway Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{openclaw_gateway_url}}/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.responseTime: lt 1000
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✓ OpenClaw gateway is healthy");
+    console.log("  URL:", bru.getEnvVar("openclaw_gateway_url"));
+    console.log("  Response time:", res.responseTime, "ms");
+  } else {
+    console.error("✗ OpenClaw gateway is DOWN");
+    console.error("  URL:", bru.getEnvVar("openclaw_gateway_url"));
+    console.error("  Status:", res.status);
+    console.error("");
+    console.error("Start OpenClaw: openclaw start");
+  }
+}
+
+tests {
+  test("OpenClaw gateway should be running", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("health check should be fast", function() {
+    expect(res.responseTime).to.be.lessThan(1000);
+  });
+}
+
+docs {
+  # OpenClaw Gateway 健康检查
+
+  **测试目的**: 验证 OpenClaw gateway 已启动且可接受请求
+
+  ## 前置条件
+
+  ```bash
+  openclaw start
+  ```
+
+  ## 环境变量
+
+  OPENCLAW_GATEWAY_URL 默认 http://127.0.0.1:3000 (或 OpenClaw 实际端口)
+}

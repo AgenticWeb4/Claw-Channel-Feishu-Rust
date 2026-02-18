@@ -1,0 +1,24 @@
+meta {
+  name: Connection Signal Timing
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis
+  body: none
+  auth: none
+}
+
+docs {
+  # 连接状态信号时机
+
+  **预期行为**: clawrs-feishu 的 `connected` 信号应在 WebSocket 实际连接时发送，
+  而非在收到第一条消息时。
+
+  ## 实现
+
+  - Rust LarkWsAdapter: 在 `LarkWsClient::open` 之前发送 `ListenEvent::Connected`
+  - NAPI: 收到 `ListenEvent::Connected` 即调用 `tsfn.call({"__signal__":"connected"})`
+  - 验证: 启动 OpenClaw + clawrs-feishu，观察日志中 `connected` 出现在首条消息之前
+  }

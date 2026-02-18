@@ -1,0 +1,127 @@
+meta {
+  name: ZeroClaw Channel Health Check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{feishu_base_url}}/open-apis/bot/v3/info
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("tenant_access_token");
+  if (!token) {
+    throw new Error("No tenant_access_token. Run 01-auth tests first.");
+  }
+}
+
+script:post-response {
+  // Simulate zeroclaw channel doctor behavior
+  const healthy = (res.status === 200 && res.body.code === 0);
+  
+  if (healthy) {
+    console.log("✓ Feishu channel: healthy");
+    console.log("  ✅ API reachable");
+    console.log("  ✅ Token valid");
+    console.log("  ✅ Bot configured");
+  } else {
+    console.error("✗ Feishu channel: unhealthy");
+    console.error("  ❌ Health check failed:", res.body.msg || "Unknown error");
+  }
+  
+  bru.setVar("channel_healthy", healthy);
+}
+
+tests {
+  test("health_check() should return true", function() {
+    // Mirrors FeishuChannel::health_check() implementation
+    const healthy = (res.status === 200 && res.body.code === 0);
+    expect(healthy).to.be.true;
+  });
+  
+  test("should verify all health indicators", function() {
+    // API reachable
+    expect(res.status).to.equal(200);
+    // Token valid
+    expect(res.body.code).to.equal(0);
+    // Bot exists
+    expect(res.body.bot).to.exist;
+  });
+  
+  test("response time should be acceptable", function() {
+    // Doctor command should complete quickly
+    expect(res.responseTime).to.be.lessThan(5000);
+  });
+}
+
+docs {
+  # F-006: 渠道健康检查 — zeroclaw channel doctor
+  
+  **功能需求**: F-006 渠道健康检查（Must）
+  **业务场景**: Scene-003 运维检查
+  **CLI 命令**: `zeroclaw channel doctor`
+  **优先级**: Must
+  
+  ## 测试目的
+  
+  模拟 `FeishuChannel::health_check()` 方法的行为，
+  验证健康检查能够正确判断飞书渠道状态。
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given 飞书已配置
+  When 执行 health_check()
+  Then 调用 GET /open-apis/bot/v3/info 验证 token
+  And 返回 true（成功）或 false（失败）
+  ```
+  
+  ## 实现映射
+  
+  ```rust
+  // clawrs-feishu/src/channel.rs
+  async fn health_check(&self) -> bool {
+      match self.auth.get_token().await {
+          Ok(token) => {
+              let url = self.api_url("bot/v3/info");
+              self.client
+                  .get(&url)
+                  .header("Authorization", format!("Bearer {token}"))
+                  .send()
+                  .await
+                  .map(|r| r.status().is_success())
+                  .unwrap_or(false)
+          }
+          Err(_) => false,
+      }
+  }
+  ```
+  
+  ## 健康指标
+  
+  - ✅ API 可达（网络连通性）
+  - ✅ Token 有效（认证层正常）
+  - ✅ Bot 已配置（应用设置正确）
+  
+  ## 失败场景
+  
+  - Token 过期 → health_check() = false
+  - 网络故障 → health_check() = false
+  - App 未启用 → health_check() = false
+  
+  ## 参考
+  
+  - channels/mod.rs::doctor_channels()
+  - Task 8: FeishuChannel trait 实现
+}

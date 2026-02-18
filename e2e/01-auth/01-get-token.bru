@@ -1,0 +1,99 @@
+meta {
+  name: Get Tenant Access Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/auth/v3/tenant_access_token/internal
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "app_id": "{{app_id}}",
+    "app_secret": "{{app_secret}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.tenant_access_token: isDefined
+  res.body.expire: gt 0
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:post-response {
+  // Store token for subsequent requests
+  if (res.body.code === 0) {
+    bru.setEnvVar("tenant_access_token", res.body.tenant_access_token);
+    console.log("✓ Token obtained:", res.body.tenant_access_token.substring(0, 20) + "...");
+    console.log("✓ Expires in:", res.body.expire, "seconds");
+  } else {
+    console.error("✗ Token fetch failed:", res.body.msg);
+    throw new Error("Failed to get tenant_access_token: " + res.body.msg);
+  }
+}
+
+tests {
+  test("should return valid token structure", function() {
+    expect(res.body).to.have.property('tenant_access_token');
+    expect(res.body).to.have.property('expire');
+    expect(res.body.tenant_access_token).to.be.a('string');
+    expect(res.body.tenant_access_token.length).to.be.greaterThan(20);
+  });
+  
+  test("token expiry should be reasonable", function() {
+    // Typical Feishu token expires in 2 hours (7200 seconds).
+    // A cached token may have less remaining, so we check >= 1800 (30 min).
+    expect(res.body.expire).to.be.greaterThan(1800);
+    expect(res.body.expire).to.be.lessThan(10800);
+  });
+  
+  test("should meet performance requirement NFR-001", function() {
+    // Token fetch should be fast
+    expect(res.responseTime).to.be.lessThan(3000);
+  });
+}
+
+docs {
+  # F-007: 配置集成 — 获取 tenant_access_token
+  
+  **功能需求**: F-007 配置集成（Must）
+  **业务场景**: Scene-001, Scene-002 前置依赖
+  **优先级**: Must
+  
+  ## 测试目的
+  
+  验证飞书认证层（BC-002）能够成功获取 `tenant_access_token`，
+  这是所有后续 API 调用的前置条件。
+  
+  ## 验收条件
+  
+  ```gherkin
+  Given app_id 和 app_secret 已配置
+  When 调用 /auth/v3/tenant_access_token/internal
+  Then 返回 code=0
+  And tenant_access_token 字段存在且长度 > 20
+  And expire 字段 > 3600 (1小时)
+  ```
+  
+  ## 错误码映射
+  
+  - `code=0` — 成功
+  - `code=10013` — 应用未启用
+  - `code=10014` — app_secret 错误
+  - 对应 E-FEISHU-1001 (token 获取失败)
+  
+  ## 参考
+  
+  - ADR-001: 直接调用飞书 HTTP API
+  - ASR-001: 认证延迟 < 50ms（此测试 < 3000ms 为外网限制）
+  - [飞书文档](https://open.feishu.cn/document/server-docs/authentication-management/access-token/tenant_access_token_internal)
+}

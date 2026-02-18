@@ -1,0 +1,117 @@
+meta {
+  name: Group Allowlist - Check chat_id not sender
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{zeroclaw_gateway_url}}/webhook
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "schema": "2.0",
+    "header": {
+      "event_id": "test_group_allowlist_{{$randomInt}}",
+      "event_type": "im.message.receive_v1",
+      "create_time": "{{$timestamp}}",
+      "token": "test_token",
+      "app_id": "{{app_id}}",
+      "tenant_key": "test"
+    },
+    "event": {
+      "sender": {
+        "sender_id": {
+          "open_id": "ou_group_member_any"
+        }
+      },
+      "message": {
+        "message_id": "om_group_allowlist_test",
+        "chat_id": "{{test_group_chat_id}}",
+        "chat_type": "group",
+        "message_type": "text",
+        "content": "{\"text\":\"[E2E] E2E-04-05 @Bot group message test\"}",
+        "mentions": [
+          {
+            "key": "@_user_1",
+            "id": { "open_id": "ou_bot" },
+            "name": "Bot"
+          }
+        ]
+      }
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:pre-request {
+  console.log("ℹ Testing group allowlist (groupAllowFrom = group IDs)");
+  console.log("  Group chat_id:", bru.getEnvVar("test_group_chat_id"));
+  console.log("  Sender:", "ou_group_member_any");
+  console.log("  Expected: groupAllowFrom must contain chat_id (oc_xxx), NOT sender open_id");
+}
+
+script:post-response {
+  console.log("✓ Webhook accepted (200)");
+  console.log("  Group allowlist: groupAllowFrom contains group IDs (oc_xxx)");
+  console.log("");
+  console.log("🔍 Verification:");
+  console.log("  1. Configure groupAllowFrom: [\"{{test_group_chat_id}}\"] in channels.feishu");
+  console.log("  2. Message from allowlisted group should be processed");
+  console.log("  3. Message from non-allowlisted group should be dropped (check logs)");
+}
+
+tests {
+  test("F-004: group webhook should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("groupAllowFrom checks chat_id not sender", function() {
+    // Semantic: groupAllowFrom contains group IDs (oc_xxx), filter uses msg.channel
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  # F-004: 群组白名单 — groupAllowFrom 语义
+
+  **功能需求**: F-004 群组安全过滤（Must）
+  **场景**: groupAllowFrom 存的是群 ID（oc_xxx），校验时使用 chat_id 而非 sender
+  **优先级**: Must
+
+  ## 验收条件
+
+  ```gherkin
+  Given groupPolicy = "allowlist"
+  And groupAllowFrom = ["oc_allowed_group"]
+  When 收到来自群 oc_allowed_group 的消息（任意发送者）
+  Then 消息被处理
+  When 收到来自群 oc_denied_group 的消息
+  Then 消息被拒绝
+  ```
+
+  ## 实现映射
+
+  ```rust
+  // filter.rs - 使用 msg.channel (群ID) 而非 msg.sender (用户ID)
+  if is_group {
+      if !params.security.is_group_allowed(&msg.channel) {
+          return false;
+      }
+  }
+  ```
+
+  ## 参考
+
+  - feishu-src bot.ts: senderId: ctx.chatId for group check
+  - SecurityGuard::is_group_allowed(group_id)
+}

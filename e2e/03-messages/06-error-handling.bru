@@ -1,0 +1,86 @@
+meta {
+  name: Error - Invalid Token
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: invalid_token_for_error_test
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "{{test_chat_id}}",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-03-06 Error handling test (expected fail)\"}"
+  }
+}
+
+assert {
+  res.body.code: gt 0
+}
+
+script:post-response {
+  console.log("✓ Invalid token error handled correctly");
+  console.log("  HTTP Status:", res.status);
+  console.log("  Error code:", res.body.code);
+  console.log("  Error message:", res.body.msg);
+  
+  const errorCodes = {
+    99991668: "Invalid access token",
+    99991663: "Insufficient permissions",
+    99991664: "Token expired",
+  };
+  
+  const errorDesc = errorCodes[res.body.code] || "Unknown error";
+  console.log("  Description:", errorDesc);
+}
+
+tests {
+  test("should return error code", function() {
+    expect(res.body.code).to.not.equal(0);
+  });
+  
+  test("should have error message", function() {
+    expect(res.body).to.have.property('msg');
+    expect(res.body.msg).to.be.a('string');
+  });
+  
+  test("error handling should be graceful", function() {
+    expect(res.body.code).to.be.greaterThan(0);
+  });
+  
+  test("should respond within timeout", function() {
+    expect(res.responseTime).to.be.lessThan(5000);
+  });
+}
+
+docs {
+  # Error handling test - Invalid Token
+  
+  Verifies that when the token is invalid, Feishu API:
+  1. Returns an error code in the response body
+  2. Includes a descriptive error message
+  3. Responds within acceptable time
+  
+  Note: Feishu may return HTTP 400 or 200 with error code,
+  depending on the API version. We only assert on body.code.
+  
+  ## Feishu error codes
+  
+  | Code | Description | ZeroClaw mapping |
+  |------|-------------|-----------------|
+  | 99991668 | Invalid token | E-FEISHU-1001 |
+  | 99991664 | Expired token | E-FEISHU-1002 |
+  | 99991663 | Insufficient perms | E-FEISHU-3001 |
+}

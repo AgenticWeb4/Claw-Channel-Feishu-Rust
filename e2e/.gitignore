@@ -1,0 +1,13 @@
+# E2E Test Artifacts
+report.json
+*.log
+
+# Environment secrets
+.env
+
+# Bruno cache
+.bruno/
+
+# Temporary files
+*.tmp
+*.bak

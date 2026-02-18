@@ -1,0 +1,89 @@
+meta {
+  name: open-lark SDK Token Management
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/auth/v3/tenant_access_token/internal
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "app_id": "{{app_id}}",
+    "app_secret": "{{app_secret}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.code: eq 0
+  res.body.tenant_access_token: isDefined
+  res.responseTime: lt {{max_response_time_ms}}
+}
+
+script:post-response {
+  if (res.body.code === 0) {
+    bru.setEnvVar("tenant_access_token", res.body.tenant_access_token);
+    console.log("✓ Token obtained (open-lark SDK compatible)");
+    console.log("  Token (first 20):", res.body.tenant_access_token.substring(0, 20) + "...");
+    console.log("  Expires in:", res.body.expire, "seconds");
+    console.log("");
+    console.log("ℹ open-lark SDK equivalent:");
+    console.log("  LarkClient::builder(app_id, app_secret)");
+    console.log("    .with_app_type(AppType::SelfBuild)");
+    console.log("    .with_enable_token_cache(true)");
+    console.log("    .build()");
+    console.log("  // SDK auto-manages token via TokenManager");
+  }
+}
+
+tests {
+  test("open-lark: internal token endpoint should work", function() {
+    expect(res.body.code).to.equal(0);
+    expect(res.body.tenant_access_token).to.be.a('string');
+    expect(res.body.tenant_access_token.length).to.be.greaterThan(20);
+  });
+
+  test("open-lark: token compatible with AppType::SelfBuild", function() {
+    // SelfBuild apps use tenant_access_token (not user_access_token)
+    // open-lark calls this with empty tenant_key and app_ticket
+    expect(res.body).to.have.property('tenant_access_token');
+    expect(res.body).to.not.have.property('app_access_token');
+  });
+
+  test("open-lark: token cache should be possible", function() {
+    // Expire > 0 means we can cache it (LarkClient with_enable_token_cache)
+    expect(res.body.expire).to.be.greaterThan(0);
+  });
+}
+
+docs {
+  # open-lark SDK Token Management Validation
+
+  Validates that the Feishu token endpoint is compatible with
+  open-lark SDK's internal token management flow.
+
+  ## Architecture mapping
+
+  ```
+  clawrs-feishu (facade)
+    └─ feishu-platform (capability)
+       └─ LarkAuthAdapter (adapter)
+          └─ open-lark LarkClient.config.token_manager
+             └─ get_tenant_access_token(config, "", "", &app_ticket_manager)
+  ```
+
+  ## open-lark SDK flow
+
+  1. LarkClient is built with app_id + app_secret
+  2. TokenManager internally caches tenant_access_token
+  3. On token expiry, auto-refreshes by calling /auth/v3/tenant_access_token/internal
+  4. All API calls use the cached token transparently
+}

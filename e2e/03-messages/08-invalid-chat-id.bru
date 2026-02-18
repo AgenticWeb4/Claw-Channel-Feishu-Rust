@@ -1,0 +1,90 @@
+meta {
+  name: Error - Invalid Chat ID
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{feishu_base_url}}/open-apis/im/v1/messages?receive_id_type=chat_id
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{tenant_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "receive_id": "oc_nonexistent_chat_id_99999",
+    "msg_type": "text",
+    "content": "{\"text\":\"[E2E] E2E-03-08 Invalid chat_id (expected fail)\"}"
+  }
+}
+
+assert {
+  res.body.code: gt 0
+}
+
+script:post-response {
+  console.log("✓ Invalid chat_id correctly rejected by Feishu");
+  console.log("  Error code:", res.body.code);
+  console.log("  Error msg:", res.body.msg);
+
+  const errorCodes = {
+    230001: "Bot not in chat / chat not found",
+    230002: "Invalid receive_id",
+    230006: "receive_id type mismatch",
+  };
+  const desc = errorCodes[res.body.code] || "Other Feishu error";
+  console.log("  Description:", desc);
+}
+
+tests {
+  test("should reject invalid chat_id", function() {
+    expect(res.body.code).to.not.equal(0);
+  });
+
+  test("should return chat-related error code", function() {
+    // Feishu returns specific error for invalid receive_id
+    expect(res.body.code).to.be.greaterThan(0);
+  });
+
+  test("should include descriptive error message", function() {
+    expect(res.body).to.have.property('msg');
+    expect(res.body.msg).to.be.a('string');
+    expect(res.body.msg.length).to.be.greaterThan(0);
+  });
+
+  test("should respond within timeout", function() {
+    expect(res.responseTime).to.be.lessThan(5000);
+  });
+}
+
+docs {
+  # Error Handling - Invalid Chat ID
+
+  Validates that sending to a nonexistent chat_id returns a proper
+  error, mapping to `FeishuError::MessageSendFailed` in domain model.
+
+  ## Architecture mapping
+
+  ```
+  LarkImAdapter::send_text(chat_id, content)
+    → client.im.v1.message.create(request, None)
+      → POST im/v1/messages (this test)
+      → code != 0 → Err(FeishuError::MessageSendFailed(msg))
+  ```
+
+  ## Error codes
+
+  | Code | Description | Domain mapping |
+  |------|-------------|---------------|
+  | 230001 | Bot not in chat | E-FEISHU-3001 |
+  | 230002 | Invalid receive_id | E-FEISHU-3001 |
+  | 230006 | receive_id type mismatch | E-FEISHU-3001 |
+}

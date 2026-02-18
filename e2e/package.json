@@ -1,0 +1,12 @@
+{
+  "name": "clawrs-feishu-e2e",
+  "private": true,
+  "description": "E2E tests for clawrs-feishu-channel (Bruno + WebSocket scripts)",
+  "scripts": {
+    "ws:flow": "node 05-websocket/03-ws-message-flow.js",
+    "ws:validate-fixtures": "node 05-websocket/04-validate-event-fixtures.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
